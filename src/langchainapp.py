@@ -1,48 +1,32 @@
+import json
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_ollama.llms import OllamaLLM
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import PromptTemplate
-from langchain_ollama import ChatOllama
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+from bs4 import BeautifulSoup as bs
+import markdownify 
 import requests
 
-url = "https://r.jina.ai/" + "https://www.allrecipes.com/recipe/274966/sheet-pan-parmesan-chicken-and-veggies/"
+#"https://r.jina.ai/" +
+# url =  "https://www.allrecipes.com/recipe/274966/sheet-pan-parmesan-chicken-and-veggies/"
 
-pageContents :str =""
-try:
-    response = requests.get(url)
-    response.raise_for_status()
+url = "https://www.allrecipes.com/recipe/283464/easy-plum-cake/"
 
-    chunk_size = 1024
-    for chunk in response.iter_content(chunk_size=chunk_size):
-        pageContents+=chunk.decode("utf-8")  # get the content chunk by chunk
-except requests.exceptions.HTTPError as http_err:
-    print(f"HTTP error occurred: {http_err}")
-except Exception as err:
-    print(f"An error occurred: {err}")
-    
-model = ChatOllama(
+# get the recipe from the url
+web_content = requests.get(url).text
+web_text = bs(web_content, "html.parser").get_text()
+
+article = bs(web_content, "html.parser").find("article").encode_contents()
+
+web_text = markdownify.markdownify(article, heading_style="ATX") 
+
+model = OllamaLLM(
                 model = "llama3.1",
                 temperature = 0,
                 verbose=True,
-                # other params ...
             )
  
-# messages = [
-#                 ("system", "You are a chef teacher. Read the contents and output the ingredients and the directions"),
-#                 ("contents", pageContents),
-#             ]
-
-query = "read the following and output only the ingredients and directions: " + pageContents
-# model.invoke(messages)
- 
-# Define your desired data structure.
-# class Joke(BaseModel):
-#     setup: str = Field(description="question to set up a joke")
-#     punchline: str = Field(description="answer to resolve the joke")
-
-
-# And a query intented to prompt a language model to populate the data structure.
-# joke_query = "Tell me a joke."
-
 class Ingredient(BaseModel):
     name:str= Field(description="name of ingredient")
     quantity:str= Field(description="quantity of measurement")
@@ -54,24 +38,40 @@ class Direction(BaseModel):
      detail:str= Field(description="step information detail")
 
 
-class Result(BaseModel):
+class Recipe(BaseModel):
     ingredients:list[Ingredient]= Field(description="ingredients")
     directions:list[Direction]= Field(description="directions")
+    @field_validator("ingredients")
+    def validate_ingredients(cls, v):
+        if len(v) == 0:
+            raise ValueError("There must be at least one ingredient.")
+        return v
+    
+    @field_validator("directions")
+    def validate_steps(cls, v):
+        if len(v) == 0:
+            raise ValueError("There must be at least one direction.")
+        return v
 
+# And a query intented to prompt a language model to populate the data structure.
+query = web_text
 
 # Set up a parser + inject instructions into the prompt template.
-parser = JsonOutputParser(pydantic_object=Result)
+parser = JsonOutputParser(pydantic_object=Recipe)
 
 prompt = PromptTemplate(
-    template="Answer the user query.\n{format_instructions}\n{query}\n",
+    template="Find the main content of this webpage. Transcribe the recipe from it. \n{format_instructions}\n{query}\n",
     input_variables=["query"],
     partial_variables={"format_instructions": parser.get_format_instructions()},
 )
-
+ 
 chain = prompt | model | parser
 
 result = chain.invoke({"query": query})
-print(result)
+data = json.dumps(result, indent=2)
+
+with open("Output.json", "w") as my_file:
+    my_file.write(data)
 
 # # Prettify the result and display the JSON
 # import json

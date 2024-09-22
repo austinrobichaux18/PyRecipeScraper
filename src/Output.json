@@ -1,0 +1,62 @@
+{
+  "ingredients": [
+    {
+      "name": "white sugar",
+      "quantity": "\u00be cup",
+      "measurement": ""
+    },
+    {
+      "name": "unsalted butter",
+      "quantity": "\u00bd cup",
+      "measurement": "at room temperature"
+    },
+    {
+      "name": "eggs",
+      "quantity": "2 large",
+      "measurement": ""
+    },
+    {
+      "name": "all-purpose flour",
+      "quantity": "1 cup",
+      "measurement": ""
+    },
+    {
+      "name": "baking powder",
+      "quantity": "1 teaspoon",
+      "measurement": ""
+    },
+    {
+      "name": "salt",
+      "quantity": "a pinch",
+      "measurement": ""
+    },
+    {
+      "name": "plums",
+      "quantity": "12 medium ripe",
+      "measurement": "halved and pitted"
+    },
+    {
+      "name": "cinnamon sugar",
+      "quantity": "1 \u00bd tablespoons",
+      "measurement": "or to taste"
+    }
+  ],
+  "directions": [
+    {
+      "number": "1",
+      "detail": "Preheat the oven to 350 degrees F (175 degrees C). Grease a 10-inch springform pan."
+    },
+    {
+      "number": "2",
+      "detail": "Combine sugar and butter in a large bowl and beat with an electric mixer until light and fluffy. Add eggs, 1 at a time, and beat well after each addition. Combine flour, baking powder, and salt in a separate bowl and sift on top of the butter mixture; mix to combine. Transfer batter into the prepared springform pan and smooth out."
+    },
+    {
+      "number": "3",
+      "detail": "Set plums inside batter, cut-side up, and sprinkle evenly with cinnamon-sugar."
+    },
+    {
+      "number": "4",
+      "detail": "Bake in the preheated oven on the lowest rack until a toothpick inserted into the center comes out clean, 40 to 50 minutes. Serve warm or cool to room temperature."
+    }
+  ]
+}
