@@ -1,4 +1,3 @@
-
 import nest_asyncio  # Import nest_asyncio module for asynchronous operations
 nest_asyncio.apply()  # Apply nest_asyncio to resolve any issues with asyncio event loop
 from scrapegraphai.graphs import SmartScraperGraph
@@ -20,50 +19,17 @@ graph_config = {
 }
 
 
-graph_schema = {
-    "name": "ScrapeGraphAI Graph Configuration",
-    "description": "JSON schema for representing graphs in the ScrapeGraphAI library",
-    "type": "object",
-    "properties": {
-        "ingredients": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "item_name": {
-                        "type": "string",
-                        "description": "name of the food stuff"
-                    },
-                    # "measurement": {
-                    #     "type": "string",
-                    #     "description": "measurement of the foodstuff example: cups, ounces, etc"
-                    # },
-                    # "quantity": {
-                    #     "type": "string",
-                    #     "description": "quantity of the food stuff"
-                    # },
-                },
-                # "required": ["item", "measurement", "quantity"]
-            }
-        },
-    },
-    # "required": ["ingredients"]
-}
-
-
-
 # Initialize SmartScraperGraph with prompt, source, and configuration
 smart_scraper_graph = SmartScraperGraph(
     #prompt="List all the content",  # Set prompt for scraping
-    prompt="List all the Ingredients and Directions.",
+    prompt="return all the urls for recipes",
     # prompt="list me all the video titles and description",
     # Source URL or HTML content to scrape
     #source="https://github.com/InsightEdge01",
     # source="https://www.youtube.com/results?search_query=path+of+exile",
-      source="https://r.jina.ai/" + "https://www.allrecipes.com/recipe/274966/sheet-pan-parmesan-chicken-and-veggies/",
+      source="https://www.allrecipes.com/recipe/274966/sheet-pan-parmesan-chicken-and-veggies/",
     #  source = content,
     config=graph_config, # Pass the graph configuration
-    schema =graph_schema
 )
 
 # Run the SmartScraperGraph and store the result

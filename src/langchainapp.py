@@ -8,76 +8,86 @@ from bs4 import BeautifulSoup as bs
 import markdownify 
 import requests
 
-#"https://r.jina.ai/" +
-# url =  "https://www.allrecipes.com/recipe/274966/sheet-pan-parmesan-chicken-and-veggies/"
-
-url = "https://www.allrecipes.com/recipe/283464/easy-plum-cake/"
-
-# get the recipe from the url
-web_content = requests.get(url).text
-web_text = bs(web_content, "html.parser").get_text()
-
-article = bs(web_content, "html.parser").find("article").encode_contents()
-
-web_text = markdownify.markdownify(article, heading_style="ATX") 
-
-model = OllamaLLM(
-                model = "llama3.1",
-                temperature = 0,
-                verbose=True,
-            )
- 
-class Ingredient(BaseModel):
-    name:str= Field(description="name of ingredient")
-    quantity:str= Field(description="quantity of measurement")
-    measurement:str= Field(description="measurement of ingredient")
-
-
-class Direction(BaseModel):
-     number:str= Field(description="step number")
-     detail:str= Field(description="step information detail")
-
-
-class Recipe(BaseModel):
-    ingredients:list[Ingredient]= Field(description="ingredients")
-    directions:list[Direction]= Field(description="directions")
-    @field_validator("ingredients")
-    def validate_ingredients(cls, v):
-        if len(v) == 0:
-            raise ValueError("There must be at least one ingredient.")
-        return v
+def get_recipe(url):
+    # get the recipe from the url
+    web_content = requests.get(url).text
     
-    @field_validator("directions")
-    def validate_steps(cls, v):
-        if len(v) == 0:
-            raise ValueError("There must be at least one direction.")
-        return v
+    doc = bs(web_content, "html.parser")
 
-# And a query intented to prompt a language model to populate the data structure.
-query = web_text
+    ingredients = doc.find("div", id="mm-recipes-structured-ingredients_1-0").encode_contents()
+    directions = doc.find("div", id="mm-recipes-steps_1-0").encode_contents()
 
-# Set up a parser + inject instructions into the prompt template.
-parser = JsonOutputParser(pydantic_object=Recipe)
+    ingredients_web_text = markdownify.markdownify(ingredients, heading_style="ATX")
+    directions_web_text = markdownify.markdownify(directions, heading_style="ATX")
 
-prompt = PromptTemplate(
-    template="Find the main content of this webpage. Transcribe the recipe from it. \n{format_instructions}\n{query}\n",
-    input_variables=["query"],
-    partial_variables={"format_instructions": parser.get_format_instructions()},
-)
- 
-chain = prompt | model | parser
 
-result = chain.invoke({"query": query})
-data = json.dumps(result, indent=2)
+    model = OllamaLLM(model="llama3.1", temperature=0) # llama3.1:8b-instruct-q2_K
 
-with open("Output.json", "w") as my_file:
-    my_file.write(data)
+    class Ingredient(BaseModel):
+        name: str = Field(description="the name of the ingredient")
+        quantity: int = Field(description="the quantity of the ingredient. list this field as a decimal value. ex: 1.0, 0.4, etc.")
+        unit: str = Field(description="the unit of the ingredient. ex: cup, tbsp, slices, whole items, to taste, pinch, etc.")
+        special_instructions: str = Field(description="any special instructions for the ingredient. example, butter is melted, chopped, etc.")
+        
+        @field_validator("quantity")
+        def validate_quantity(cls, v):
+            if isinstance(v, str):
+                # try to convert the string to a number
+                try:
+                    v = float(v)
+                except ValueError:
+                    raise ValueError("The quantity must be a number.")
+                return v
+            else:
+                return v
+            
 
-# # Prettify the result and display the JSON
-# import json
-# output = json.dumps(result, indent=2)  # Convert result to JSON format with indentation
-# line_list = output.split("\n")  # Split the JSON string into lines
-# # Print each line of the JSON separately
-# for line in line_list:
-#     print(line)
- 
+    class Step(BaseModel):
+        description: str = Field(description="the step description")
+
+    # Define your desired data structure.
+    class Recipe(BaseModel):
+        ingredients: list[Ingredient] = Field(description="a list of recipe ingredients")
+        
+        @field_validator("ingredients")
+        def validate_ingredients(cls, v):
+            if len(v) == 0:
+                raise ValueError("There must be at least one ingredient.")
+            return v
+
+    class RecipeSteps(BaseModel):
+        title: str = Field(description="the title of the recipe")
+        steps: list[Step] = Field(description="a list of steps to follow to make the recipe")
+
+    # Set up a parser + inject instructions into the prompt template.
+    ingredients_parser = JsonOutputParser(pydantic_object=Recipe)
+
+    ingredients_prompt = PromptTemplate(
+        template="Here is a webpage that contains a recipe. Find the ingredients listed in the recipe. only print the json with no additional commentary. \n{format_instructions}\n{query}\n",
+        input_variables=["query"],
+        partial_variables={"format_instructions": ingredients_parser.get_format_instructions()},
+    )
+
+    ingredient_chain = ingredients_prompt | model | ingredients_parser
+
+    recipe_parser = JsonOutputParser(pydantic_object=RecipeSteps)
+    recipe_prompt = PromptTemplate(
+        template="Here is a webpage that contains a recipe. List the to steps to create the recipe. only print the json with no additional commentary. \n{format_instructions}\n{query}\n",
+        input_variables=["query"],
+        partial_variables={"format_instructions": recipe_parser.get_format_instructions()},
+    )
+    recipe_chain = recipe_prompt | model | recipe_parser
+
+
+    ingredients_result = ingredient_chain.invoke({"query": ingredients_web_text})
+
+    recipe_result = recipe_chain.invoke({"query": directions_web_text})
+
+    print(json.dumps(ingredients_result, indent=2))
+    print(json.dumps(recipe_result, indent=2))
+    
+# get_recipe("https://www.allrecipes.com/recipe/244520/belizean-chicken-stew/")
+# get_recipe("https://www.allrecipes.com/recipe/15181/famous-chicken-francaise/")
+# get_recipe("https://www.allrecipes.com/country-ham-and-biscuits-recipe-8707673")
+get_recipe("https://www.allrecipes.com/recipe/274966/sheet-pan-parmesan-chicken-and-veggies/")
+
