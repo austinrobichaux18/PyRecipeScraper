@@ -1,10 +1,9 @@
-import json
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_ollama.llms import OllamaLLM
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import PromptTemplate
 from pydantic import BaseModel, Field, field_validator
 from bs4 import BeautifulSoup as bs
+import json
 import markdownify 
 import requests
 
@@ -23,6 +22,33 @@ def get_recipe(url):
 
     model = OllamaLLM(model="llama3.1", temperature=0) # llama3.1:8b-instruct-q2_K
 
+    # Set up a parser + inject instructions into the prompt template.
+    ingredients_parser = JsonOutputParser(pydantic_object=Recipe)
+
+    ingredients_prompt = PromptTemplate(
+        template="Here is a webpage that contains a recipe. Find the ingredients listed in the recipe. only print the json with no additional commentary. \n{format_instructions}\n{query}\n",
+        input_variables=["query"],
+        partial_variables={"format_instructions": ingredients_parser.get_format_instructions()},
+    )
+
+    ingredient_chain = ingredients_prompt | model | ingredients_parser
+
+    recipe_parser = JsonOutputParser(pydantic_object=RecipeSteps)
+    recipe_prompt = PromptTemplate(
+        template="Here is a webpage that contains a recipe. List the to steps to create the recipe. only print the json with no additional commentary. \n{format_instructions}\n{query}\n",
+        input_variables=["query"],
+        partial_variables={"format_instructions": recipe_parser.get_format_instructions()},
+    )
+    recipe_chain = recipe_prompt | model | recipe_parser
+
+    ingredients_result = ingredient_chain.invoke({"query": ingredients_web_text})
+
+    recipe_result = recipe_chain.invoke({"query": directions_web_text})
+
+    print(json.dumps(ingredients_result, indent=2))
+    print(json.dumps(recipe_result, indent=2))
+
+# Classes
     class Ingredient(BaseModel):
         name: str = Field(description="the name of the ingredient")
         quantity: int = Field(description="the quantity of the ingredient. list this field as a decimal value. ex: 1.0, 0.4, etc.")
@@ -58,36 +84,6 @@ def get_recipe(url):
     class RecipeSteps(BaseModel):
         title: str = Field(description="the title of the recipe")
         steps: list[Step] = Field(description="a list of steps to follow to make the recipe")
+        
 
-    # Set up a parser + inject instructions into the prompt template.
-    ingredients_parser = JsonOutputParser(pydantic_object=Recipe)
-
-    ingredients_prompt = PromptTemplate(
-        template="Here is a webpage that contains a recipe. Find the ingredients listed in the recipe. only print the json with no additional commentary. \n{format_instructions}\n{query}\n",
-        input_variables=["query"],
-        partial_variables={"format_instructions": ingredients_parser.get_format_instructions()},
-    )
-
-    ingredient_chain = ingredients_prompt | model | ingredients_parser
-
-    recipe_parser = JsonOutputParser(pydantic_object=RecipeSteps)
-    recipe_prompt = PromptTemplate(
-        template="Here is a webpage that contains a recipe. List the to steps to create the recipe. only print the json with no additional commentary. \n{format_instructions}\n{query}\n",
-        input_variables=["query"],
-        partial_variables={"format_instructions": recipe_parser.get_format_instructions()},
-    )
-    recipe_chain = recipe_prompt | model | recipe_parser
-
-
-    ingredients_result = ingredient_chain.invoke({"query": ingredients_web_text})
-
-    recipe_result = recipe_chain.invoke({"query": directions_web_text})
-
-    print(json.dumps(ingredients_result, indent=2))
-    print(json.dumps(recipe_result, indent=2))
-    
-# get_recipe("https://www.allrecipes.com/recipe/244520/belizean-chicken-stew/")
-# get_recipe("https://www.allrecipes.com/recipe/15181/famous-chicken-francaise/")
-# get_recipe("https://www.allrecipes.com/country-ham-and-biscuits-recipe-8707673")
-get_recipe("https://www.allrecipes.com/recipe/274966/sheet-pan-parmesan-chicken-and-veggies/")
 
